@@ -2281,3 +2281,66 @@ func TestAreTagsUpdated(t *testing.T) {
 		})
 	}
 }
+
+func TestIsVSphereOverrideSecret(t *testing.T) {
+	tests := []struct {
+		name        string
+		namespace   string
+		annotations map[string]string
+		expect      bool
+	}{
+		{
+			name:      "valid override: correct namespace with both annotations",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-machine-api",
+				constants.VSphereCredTargetSecretNameAnnotation:      "vsphere-cloud-credentials",
+			},
+			expect: true,
+		},
+		{
+			name:      "wrong namespace: returns false",
+			namespace: "kube-system",
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-machine-api",
+				constants.VSphereCredTargetSecretNameAnnotation:      "vsphere-cloud-credentials",
+			},
+			expect: false,
+		},
+		{
+			name:        "nil annotations: returns false",
+			namespace:   constants.VSphereCredOverrideNamespace,
+			annotations: nil,
+			expect:      false,
+		},
+		{
+			name:        "empty annotations map: returns false",
+			namespace:   constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{},
+			expect:      false,
+		},
+		{
+			name:      "missing target-secret-name annotation only: returns false",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-machine-api",
+			},
+			expect: false,
+		},
+		{
+			name:      "missing target-secret-namespace annotation only: returns false",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNameAnnotation: "vsphere-cloud-credentials",
+			},
+			expect: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsVSphereOverrideSecret(tt.namespace, tt.annotations)
+			assert.Equal(t, tt.expect, result)
+		})
+	}
+}

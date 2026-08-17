@@ -17,6 +17,7 @@ package actuator
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -256,6 +259,28 @@ func TestGetCredentialsRootSecret(t *testing.T) {
 			assert.Equal(t, tt.expectDataValue, string(secret.Data[tt.expectDataKey]))
 		})
 	}
+
+	// Separate subtest for the List error path using an interceptor-based fake client
+	t.Run("list error in override namespace: returns error", func(t *testing.T) {
+		listErrClient := fake.NewClientBuilder().
+			WithInterceptorFuncs(interceptor.Funcs{
+				List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					return fmt.Errorf("simulated list error")
+				},
+			}).Build()
+		fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(testRootSecret()).Build()
+
+		actuator := &VSphereActuator{
+			Client:         listErrClient,
+			RootCredClient: fakeRootCredClient,
+		}
+
+		cr := testCredentialsRequest("openshift-machine-api", testTargetSecret)
+		secret, err := actuator.GetCredentialsRootSecret(context.TODO(), cr)
+		require.Error(t, err)
+		assert.Nil(t, secret)
+		assert.Contains(t, err.Error(), "error listing secrets in")
+	})
 }
 
 func TestNeedsUpdate(t *testing.T) {
