@@ -10,12 +10,19 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/ibmcloud"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/nutanix"
+	"github.com/openshift/cloud-credential-operator/pkg/version"
 )
 
-func main() {
+func newRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "ccoctl",
 		Short: "OpenShift credentials provisioning tool",
+	}
+
+	if v := version.Get().String(); len(v) == 0 {
+		rootCmd.Version = "<unknown>"
+	} else {
+		rootCmd.Version = v
 	}
 
 	rootCmd.AddCommand(aws.NewAWSCmd())
@@ -24,7 +31,11 @@ func main() {
 	rootCmd.AddCommand(nutanix.NewNutanixCmd())
 	rootCmd.AddCommand(azure.NewAzureCmd())
 
-	if err := rootCmd.Execute(); err != nil {
+	return rootCmd
+}
+
+func main() {
+	if err := newRootCmd().Execute(); err != nil {
 		log.Fatal(err)
 	}
 }
